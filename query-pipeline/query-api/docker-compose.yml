@@ -1,0 +1,228 @@
+version: '3.8'
+
+services:
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: query-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9091
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093,CONTROLLER://0.0.0.0:9091
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  query-api:
+    build: ./query-api
+    ports:
+      - "7861:7861"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - OMP_NUM_THREADS=4
+      - OPENBLAS_NUM_THREADS=4
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+
+  cnos-renderer:
+    build: ./cnos-renderer
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - OMP_NUM_THREADS=8
+      - OPENBLAS_NUM_THREADS=8
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 4G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  point-extractor:
+    build: ./point-extractor
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - OMP_NUM_THREADS=8
+      - OPENBLAS_NUM_THREADS=8
+      - NUMBA_NUM_THREADS=8
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 4G
+
+  feature-coordinator:
+    build: ./feature-fusion
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - OMP_NUM_THREADS=4
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+
+  gedi-processor:
+    build: ./gedi-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - OMP_NUM_THREADS=6
+      - OPENBLAS_NUM_THREADS=6
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 6G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  dinov2-processor:
+    build: ./dinov2-processor
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - OMP_NUM_THREADS=6
+      - OPENBLAS_NUM_THREADS=6
+      - CUDA_DEVICE_ORDER=PCI_BUS_ID
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 6G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  feature-fusion:
+    build: ./feature-fusion
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - OMP_NUM_THREADS=4
+      - OPENBLAS_NUM_THREADS=4
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+
+  result-coordinator:
+    build: ./result-coordinator
+    ports:
+      - "8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - OMP_NUM_THREADS=4
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 2G
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  kafka_data:
+    driver: local
+

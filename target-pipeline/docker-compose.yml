@@ -1,0 +1,164 @@
+version: '3.8'
+
+networks:
+  target-network:
+    driver: bridge
+
+volumes:
+  target-kafka-data:
+    driver: local
+  target-data:
+    driver: local
+  target-output:
+    driver: local
+
+services:
+  # Kafka Message Broker for Target Pipeline (Fixed Configuration)
+  target-kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: target-kafka
+    container_name: target-kafka
+    ports:
+      - "9093:9092"  # Different port from query pipeline
+    networks:
+      - target-network
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@target-kafka:29093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://target-kafka:29092,CONTROLLER://target-kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://target-kafka:29092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: zKDRDeqfR-y0doLyGaLoww
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - target-kafka-data:/var/lib/kafka/data
+    user: "0:0"  # Run as root to avoid permission issues
+    healthcheck:
+      test: kafka-topics --bootstrap-server target-kafka:29092 --list
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Target API - Entry Point for Video Sequences
+  target-api:
+    build: ./target-api
+    container_name: target-api
+    ports:
+      - "8001:8001"  # Different port from query API (8000)
+    networks:
+      - target-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    volumes:
+      - target-data:/app/data
+      - target-output:/app/output
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Point Cloud Generator with GPU Acceleration and Multithreading
+  point-cloud-generator:
+    build: ./point-cloud-generator
+    container_name: target-point-cloud-generator
+    networks:
+      - target-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+      - OMP_NUM_THREADS=32
+      - OPENBLAS_NUM_THREADS=32
+      - MKL_NUM_THREADS=32
+      - NUMBA_NUM_THREADS=32
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=0
+    volumes:
+      - target-data:/app/data
+      - target-output:/app/output
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Target DINOv2 Processor (Python 3.11) - Parallel Processing
+  target-dinov2-processor:
+    build: ./target-dinov2-processor
+    container_name: target-dinov2-processor
+    networks:
+      - target-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+      - CUDA_VISIBLE_DEVICES=0
+      - GPU_MEMORY_FRACTION=0.25
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+      - OMP_NUM_THREADS=16
+      - OPENBLAS_NUM_THREADS=16
+    volumes:
+      - target-data:/app/data
+      - target-output:/app/output
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Target GeDi Processor (Python 3.8.20) - Parallel Processing
+  target-gedi-processor:
+    build: ./target-gedi-processor
+    container_name: target-gedi-processor
+    networks:
+      - target-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+      - CUDA_VISIBLE_DEVICES=0
+      - GPU_MEMORY_FRACTION=0.25
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+      - OMP_NUM_THREADS=16
+    volumes:
+      - target-data:/app/data
+      - target-output:/app/output
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Target Feature Fusion (Python 3.11) - Final Output Generation
+  target-feature-fusion:
+    build: ./target-feature-fusion
+    container_name: target-feature-fusion
+    networks:
+      - target-network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+      - OMP_NUM_THREADS=16
+      - OPENBLAS_NUM_THREADS=16
+    volumes:
+      - target-output:/app/output
+    depends_on:
+      target-kafka:
+        condition: service_healthy
+    restart: unless-stopped
