@@ -57,12 +57,11 @@ services:
   target-api:
     build: ./target-pipeline/target-api
     container_name: target-api
-    ports:
-    - 8001:8001
     networks:
     - pose-estimation-network
     environment:
     - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - CUDA_VISIBLE_DEVICES=0
     volumes:
     - target-data:/app/data
     - target-output:/app/output
@@ -76,110 +75,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    restart: unless-stopped
-
-  target-point-cloud-generator:
-    build: ./target-pipeline/point-cloud-generator
-    container_name: target-point-cloud-generator
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-    - OMP_NUM_THREADS=32
-    - OPENBLAS_NUM_THREADS=32
-    - MKL_NUM_THREADS=32
-    - NUMBA_NUM_THREADS=32
-    - CUDA_VISIBLE_DEVICES=0
-    - NVIDIA_VISIBLE_DEVICES=0
-    volumes:
-    - target-data:/app/data
-    - target-output:/app/output
-    depends_on:
-      target-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  target-dinov2-processor:
-    build: ./target-pipeline/target-dinov2-processor
-    container_name: target-dinov2-processor
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-    - CUDA_VISIBLE_DEVICES=0
-    - GPU_MEMORY_FRACTION=0.25
-    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
-    - OMP_NUM_THREADS=16
-    - OPENBLAS_NUM_THREADS=16
-    volumes:
-    - target-data:/app/data
-    - target-output:/app/output
-    depends_on:
-      target-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  target-gedi-processor:
-    build: ./target-pipeline/target-gedi-processor
-    container_name: target-gedi-processor
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-    - CUDA_VISIBLE_DEVICES=0
-    - GPU_MEMORY_FRACTION=0.25
-    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-    - OMP_NUM_THREADS=16
-    volumes:
-    - target-data:/app/data
-    - target-output:/app/output
-    depends_on:
-      target-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  target-feature-fusion:
-    build: ./target-pipeline/target-feature-fusion
-    container_name: target-feature-fusion
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-    - OMP_NUM_THREADS=16
-    - OPENBLAS_NUM_THREADS=16
-    volumes:
-    - target-output:/app/output
-    - shared-output:/app/shared
-    depends_on:
-      target-kafka:
-        condition: service_healthy
     restart: unless-stopped
 
   query-kafka:
@@ -211,9 +106,10 @@ services:
     - query-kafka-data:/tmp/kraft-combined-logs
     user: 0:0
     healthcheck:
-      test:
-      - CMD-SHELL
-      - kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1
+      test: [
+        "CMD-SHELL",
+        "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"
+      ]
       interval: 10s
       timeout: 10s
       retries: 5
@@ -222,12 +118,11 @@ services:
   query-api:
     build: ./query-pipeline/query-api
     container_name: query-api
-    ports:
-    - 7861:7861
     networks:
     - pose-estimation-network
     environment:
     - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - CUDA_VISIBLE_DEVICES=0
     volumes:
     - query-data:/app/data
     - query-output:/app/output
@@ -243,125 +138,16 @@ services:
       start_period: 40s
     restart: unless-stopped
 
-  cnos-renderer:
-    build: ./query-pipeline/cnos-renderer
-    container_name: cnos-renderer
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-    - CUDA_VISIBLE_DEVICES=0
-    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-    volumes:
-    - query-data:/app/data
-    - query-output:/app/output
-    depends_on:
-      query-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  query-point-extractor:
-    build: ./query-pipeline/point-extractor
-    container_name: query-point-extractor
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-    volumes:
-    - query-data:/app/data
-    - query-output:/app/output
-    depends_on:
-      query-kafka:
-        condition: service_healthy
-    restart: unless-stopped
-
-  query-dinov2-processor:
-    build: ./query-pipeline/dinov2-processor
-    container_name: query-dinov2-processor
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-    - CUDA_VISIBLE_DEVICES=0
-    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-    volumes:
-    - query-data:/app/data
-    - query-output:/app/output
-    depends_on:
-      query-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  query-gedi-processor:
-    build: ./query-pipeline/gedi-processor
-    container_name: query-gedi-processor
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-    - CUDA_VISIBLE_DEVICES=0
-    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-    volumes:
-    - query-data:/app/data
-    - query-output:/app/output
-    depends_on:
-      query-kafka:
-        condition: service_healthy
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            device_ids:
-            - '0'
-            capabilities:
-            - gpu
-    restart: unless-stopped
-
-  query-feature-fusion:
-    build: ./query-pipeline/feature-fusion
-    container_name: query-feature-fusion
-    networks:
-    - pose-estimation-network
-    environment:
-    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-    volumes:
-    - query-output:/app/output
-    - shared-output:/app/shared
-    depends_on:
-      query-kafka:
-        condition: service_healthy
-    restart: unless-stopped
-
   pose-overlay-pipeline:
     build: ./pose-overlay-pipeline
     container_name: pose-overlay-pipeline
-    ports:
-    - 8002:8002
     networks:
     - pose-estimation-network
     environment:
     - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092,query-kafka:9092
     - OMP_NUM_THREADS=16
     - OPENBLAS_NUM_THREADS=16
+    - CUDA_VISIBLE_DEVICES=0
     volumes:
     - shared-data:/app/data
     - shared-output:/app/output

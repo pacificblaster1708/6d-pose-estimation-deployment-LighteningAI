@@ -1,8 +1,12 @@
-// Internal communication within Docker container
+// Updated API endpoints for single-service deployment
 const API_ENDPOINTS = {
-    target: 'http://target-api:8001',
-    query: 'http://query-api:7861',
-    poseOverlay: 'http://pose-overlay-pipeline:8002'
+    // All requests now go through the main service (port 3000)
+    target: '/api/target',
+    query: '/api/query',
+    poseOverlay: '/api/pose-overlay',
+    health: '/health',
+    upload: '/upload',
+    process: '/process'
 };
 
 // Your existing API key
@@ -31,6 +35,29 @@ class PoseEstimationPipeline {
         this.setupEventListeners();
         this.setupFileUploads();
         this.initializeInterface();
+        this.checkServiceHealth();
+    }
+
+    // New method to check service health
+    async checkServiceHealth() {
+        try {
+            const response = await fetch(API_ENDPOINTS.health, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const healthData = await response.json();
+                this.addLog('success', `Service health check passed: ${healthData.status}`);
+            } else {
+                this.addLog('warning', 'Service health check failed, but continuing...');
+            }
+        } catch (error) {
+            this.addLog('warning', `Health check error: ${error.message}`);
+        }
     }
 
     setupEventListeners() {
@@ -140,7 +167,7 @@ class PoseEstimationPipeline {
         });
     }
 
-    handleFileUpload(type, file, zone, status) {
+    async handleFileUpload(type, file, zone, status) {
         if (!file) return;
 
         // Validate file type
@@ -161,10 +188,10 @@ class PoseEstimationPipeline {
             return;
         }
 
-        // Store file
+        // Store file locally
         this.uploadedFiles[type] = file;
 
-        // Update UI
+        // Update UI immediately
         zone.classList.add('uploaded');
         status.textContent = `✓ ${file.name} (${this.formatFileSize(file.size)})`;
         status.className = 'upload-status success';
@@ -174,6 +201,34 @@ class PoseEstimationPipeline {
 
         // Log upload
         this.addLog('info', `Uploaded ${type}: ${file.name}`);
+
+        // Optional: Upload to server immediately
+        try {
+            await this.uploadFileToServer(type, file);
+        } catch (error) {
+            this.addLog('warning', `Upload to server failed: ${error.message}`);
+        }
+    }
+
+    // New method to upload files to server
+    async uploadFileToServer(type, file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', type);
+
+        const response = await fetch(API_ENDPOINTS.upload, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${API_KEY}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        return await response.json();
     }
 
     formatFileSize(bytes) {
@@ -229,9 +284,26 @@ class PoseEstimationPipeline {
         this.addLog('info', 'Starting 6D pose estimation pipeline...');
 
         try {
-            await this.runPipelineSteps();
-            this.addLog('success', 'Pipeline completed successfully!');
-            this.showResults();
+            // Send processing request to server
+            const response = await fetch(API_ENDPOINTS.process, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    pipeline: this.currentPipeline,
+                    files: Object.keys(this.uploadedFiles).filter(key => this.uploadedFiles[key] !== null)
+                })
+            });
+
+            if (response.ok) {
+                await this.runPipelineSteps();
+                this.addLog('success', 'Pipeline completed successfully!');
+                this.showResults();
+            } else {
+                throw new Error(`Processing failed: ${response.statusText}`);
+            }
         } catch (error) {
             this.addLog('error', `Pipeline failed: ${error.message}`);
             this.handleError(error);
