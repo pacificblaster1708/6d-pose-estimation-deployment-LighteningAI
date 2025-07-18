@@ -5,40 +5,32 @@ networks:
     driver: bridge
 
 volumes:
-  # Target Pipeline Volumes
   target-kafka-data:
     driver: local
   target-data:
     driver: local
   target-output:
     driver: local
-  
-  # Query Pipeline Volumes
   query-kafka-data:
     driver: local
   query-data:
     driver: local
   query-output:
     driver: local
-  
-  # Shared Volumes for Pipeline Integration
   shared-data:
     driver: local
   shared-output:
     driver: local
 
 services:
-  # ==================== TARGET PIPELINE SERVICES ====================
-  
-  # Target Kafka Message Broker
   target-kafka:
     image: confluentinc/cp-kafka:7.4.0
     hostname: target-kafka
     container_name: target-kafka
     ports:
-      - "9093:9092"
+    - 9093:9092
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -51,10 +43,10 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       CLUSTER_ID: zKDRDeqfR-y0doLyGaLoww
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     volumes:
-      - target-kafka-data:/var/lib/kafka/data
-    user: "0:0"
+    - target-kafka-data:/var/lib/kafka/data
+    user: 0:0
     healthcheck:
       test: kafka-topics --bootstrap-server target-kafka:29092 --list
       interval: 30s
@@ -62,42 +54,40 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Target API - Video Sequence Upload
   target-api:
     build: ./target-pipeline/target-api
     container_name: target-api
     ports:
-      - "8001:8001"
+    - 8001:8001
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
     volumes:
-      - target-data:/app/data
-      - target-output:/app/output
-      - shared-data:/app/shared
+    - target-data:/app/data
+    - target-output:/app/output
+    - shared-data:/app/shared
     depends_on:
       target-kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # Target Point Cloud Generator
   target-point-cloud-generator:
     build: ./target-pipeline/point-cloud-generator
     container_name: target-point-cloud-generator
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-      - OMP_NUM_THREADS=32
-      - OPENBLAS_NUM_THREADS=32
-      - MKL_NUM_THREADS=32
-      - NUMBA_NUM_THREADS=32
-      - CUDA_VISIBLE_DEVICES=0
-      - NVIDIA_VISIBLE_DEVICES=0
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - OMP_NUM_THREADS=32
+    - OPENBLAS_NUM_THREADS=32
+    - MKL_NUM_THREADS=32
+    - NUMBA_NUM_THREADS=32
+    - CUDA_VISIBLE_DEVICES=0
+    - NVIDIA_VISIBLE_DEVICES=0
     volumes:
-      - target-data:/app/data
-      - target-output:/app/output
+    - target-data:/app/data
+    - target-output:/app/output
     depends_on:
       target-kafka:
         condition: service_healthy
@@ -105,27 +95,28 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Target DINOv2 Processor
   target-dinov2-processor:
     build: ./target-pipeline/target-dinov2-processor
     container_name: target-dinov2-processor
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-      - CUDA_VISIBLE_DEVICES=0
-      - GPU_MEMORY_FRACTION=0.25
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
-      - OMP_NUM_THREADS=16
-      - OPENBLAS_NUM_THREADS=16
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - CUDA_VISIBLE_DEVICES=0
+    - GPU_MEMORY_FRACTION=0.25
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256
+    - OMP_NUM_THREADS=16
+    - OPENBLAS_NUM_THREADS=16
     volumes:
-      - target-data:/app/data
-      - target-output:/app/output
+    - target-data:/app/data
+    - target-output:/app/output
     depends_on:
       target-kafka:
         condition: service_healthy
@@ -133,26 +124,27 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Target GeDi Processor
   target-gedi-processor:
     build: ./target-pipeline/target-gedi-processor
     container_name: target-gedi-processor
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-      - CUDA_VISIBLE_DEVICES=0
-      - GPU_MEMORY_FRACTION=0.25
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
-      - OMP_NUM_THREADS=16
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - CUDA_VISIBLE_DEVICES=0
+    - GPU_MEMORY_FRACTION=0.25
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+    - OMP_NUM_THREADS=16
     volumes:
-      - target-data:/app/data
-      - target-output:/app/output
+    - target-data:/app/data
+    - target-output:/app/output
     depends_on:
       target-kafka:
         condition: service_healthy
@@ -160,40 +152,38 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Target Feature Fusion
   target-feature-fusion:
     build: ./target-pipeline/target-feature-fusion
     container_name: target-feature-fusion
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
-      - OMP_NUM_THREADS=16
-      - OPENBLAS_NUM_THREADS=16
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092
+    - OMP_NUM_THREADS=16
+    - OPENBLAS_NUM_THREADS=16
     volumes:
-      - target-output:/app/output
-      - shared-output:/app/shared
+    - target-output:/app/output
+    - shared-output:/app/shared
     depends_on:
       target-kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # ==================== QUERY PIPELINE SERVICES ====================
-  
-  # Query Kafka Message Broker
   query-kafka:
     image: confluentinc/cp-kafka:latest
     hostname: query-kafka
     container_name: query-kafka
     ports:
-      - "9092:9092"
+    - 9092:9092
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -206,53 +196,53 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     volumes:
-      - query-kafka-data:/tmp/kraft-combined-logs
-    user: "0:0"
+    - query-kafka-data:/tmp/kraft-combined-logs
+    user: 0:0
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      test:
+      - CMD-SHELL
+      - kafka-broker-api-versions --bootstrap-server localhost:9092 > /dev/null 2>&1
       interval: 10s
       timeout: 10s
       retries: 5
     restart: unless-stopped
 
-  # Query API - Object Query Processing
   query-api:
     build: ./query-pipeline/query-api
     container_name: query-api
     ports:
-      - "7861:7861"
+    - 7861:7861
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
     volumes:
-      - query-data:/app/data
-      - query-output:/app/output
-      - shared-data:/app/shared
+    - query-data:/app/data
+    - query-output:/app/output
+    - shared-data:/app/shared
     depends_on:
       query-kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # CNOS Renderer
   cnos-renderer:
     build: ./query-pipeline/cnos-renderer
     container_name: cnos-renderer
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - CUDA_VISIBLE_DEVICES=0
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
     volumes:
-      - query-data:/app/data
-      - query-output:/app/output
+    - query-data:/app/data
+    - query-output:/app/output
     depends_on:
       query-kafka:
         condition: service_healthy
@@ -260,40 +250,40 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Query Point Extractor
   query-point-extractor:
     build: ./query-pipeline/point-extractor
     container_name: query-point-extractor
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
     volumes:
-      - query-data:/app/data
-      - query-output:/app/output
+    - query-data:/app/data
+    - query-output:/app/output
     depends_on:
       query-kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # Query DINOv2 Processor
   query-dinov2-processor:
     build: ./query-pipeline/dinov2-processor
     container_name: query-dinov2-processor
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - CUDA_VISIBLE_DEVICES=0
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
     volumes:
-      - query-data:/app/data
-      - query-output:/app/output
+    - query-data:/app/data
+    - query-output:/app/output
     depends_on:
       query-kafka:
         condition: service_healthy
@@ -301,24 +291,25 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Query GeDi Processor
   query-gedi-processor:
     build: ./query-pipeline/gedi-processor
     container_name: query-gedi-processor
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
-      - CUDA_VISIBLE_DEVICES=0
-      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - CUDA_VISIBLE_DEVICES=0
+    - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
     volumes:
-      - query-data:/app/data
-      - query-output:/app/output
+    - query-data:/app/data
+    - query-output:/app/output
     depends_on:
       query-kafka:
         condition: service_healthy
@@ -326,49 +317,64 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     restart: unless-stopped
 
-  # Query Feature Fusion
   query-feature-fusion:
     build: ./query-pipeline/feature-fusion
     container_name: query-feature-fusion
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
+    - KAFKA_BOOTSTRAP_SERVERS=query-kafka:9092
     volumes:
-      - query-output:/app/output
-      - shared-output:/app/shared
+    - query-output:/app/output
+    - shared-output:/app/shared
     depends_on:
       query-kafka:
         condition: service_healthy
     restart: unless-stopped
 
-  # ==================== POSE OVERLAY PIPELINE ====================
-  
-  # Pose Overlay Pipeline - 6D Pose Estimation
   pose-overlay-pipeline:
     build: ./pose-overlay-pipeline
     container_name: pose-overlay-pipeline
     ports:
-      - "8002:8002"
+    - 8002:8002
     networks:
-      - pose-estimation-network
+    - pose-estimation-network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092,query-kafka:9092
-      - OMP_NUM_THREADS=16
-      - OPENBLAS_NUM_THREADS=16
+    - KAFKA_BOOTSTRAP_SERVERS=target-kafka:29092,query-kafka:9092
+    - OMP_NUM_THREADS=16
+    - OPENBLAS_NUM_THREADS=16
     volumes:
-      - shared-data:/app/data
-      - shared-output:/app/output
-      - target-output:/app/target_data
-      - query-output:/app/query_data
+    - shared-data:/app/data
+    - shared-output:/app/output
+    - target-output:/app/target_data
+    - query-output:/app/query_data
     depends_on:
       target-kafka:
         condition: service_healthy
       query-kafka:
         condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+    - 3000:3000
+    depends_on:
+      target-api:
+        condition: service_healthy
+      query-api:
+        condition: service_healthy
+      pose-overlay-pipeline:
+        condition: service_healthy
+    environment:
+    - NODE_ENV=production
+    networks:
+    - pose-estimation-network
     restart: unless-stopped

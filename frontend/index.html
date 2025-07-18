@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6D Pose Estimation Pipeline - AI/ML Team 026</title>
+    <link rel="stylesheet" href="cyberpunk-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="cyber-grid"></div>
+    
+    <!-- Header Section -->
+    <header class="header">
+        <div class="header-content">
+            <h1 class="main-title">6D POSE ESTIMATION</h1>
+            <h2 class="team-subtitle">AI/ML TEAM 026</h2>
+            <h3 class="problem-statement">Problem Statement 15</h3>
+        </div>
+        <div class="header-effects">
+            <div class="cyber-line"></div>
+            <div class="cyber-line"></div>
+            <div class="cyber-line"></div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <h2 class="section-title">
+                <i class="fas fa-upload"></i> Data Input Matrix
+            </h2>
+            
+            <div class="upload-grid">
+                <!-- PLY Model Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-cube"></i>
+                        <h3>3D CAD Model</h3>
+                    </div>
+                    <div class="upload-zone" id="plyUpload">
+                        <input type="file" id="plyFile" accept=".ply" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">📦</div>
+                            <p>Upload .ply CAD Model</p>
+                            <span class="file-info">Required • 3D Mesh Format</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="plyStatus"></div>
+                </div>
+
+                <!-- Texture Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-image"></i>
+                        <h3>Texture Map</h3>
+                    </div>
+                    <div class="upload-zone optional" id="textureUpload">
+                        <input type="file" id="textureFile" accept=".jpg,.jpeg,.png,.bmp" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">🎨</div>
+                            <p>Upload Texture Image</p>
+                            <span class="file-info">Optional • .jpg, .png, .bmp</span>
+                        </div>
+                        <div class="optional-toggle">
+                            <label class="cyber-switch">
+                                <input type="checkbox" id="textureToggle">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Skip if embedded in PLY</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="textureStatus"></div>
+                </div>
+
+                <!-- RGB Images Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-images"></i>
+                        <h3>RGB Sequence</h3>
+                    </div>
+                    <div class="upload-zone" id="rgbUpload">
+                        <input type="file" id="rgbFile" accept=".zip" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">📸</div>
+                            <p>Upload RGB Image Frames</p>
+                            <span class="file-info">Required • .zip archive</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="rgbStatus"></div>
+                </div>
+
+                <!-- Binary Masks Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-mask"></i>
+                        <h3>Binary Masks</h3>
+                    </div>
+                    <div class="upload-zone" id="maskUpload">
+                        <input type="file" id="maskFile" accept=".zip" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">🎭</div>
+                            <p>Upload Binary Mask Frames</p>
+                            <span class="file-info">Required • .zip archive</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="maskStatus"></div>
+                </div>
+
+                <!-- Depth Maps Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-layer-group"></i>
+                        <h3>Depth Maps</h3>
+                    </div>
+                    <div class="upload-zone" id="depthUpload">
+                        <input type="file" id="depthFile" accept=".zip" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">🗺️</div>
+                            <p>Upload Depth Map Frames</p>
+                            <span class="file-info">Required • .zip archive</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="depthStatus"></div>
+                </div>
+
+                <!-- Camera Intrinsics Upload -->
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-camera"></i>
+                        <h3>Camera Intrinsics</h3>
+                    </div>
+                    <div class="upload-zone" id="intrinsicsUpload">
+                        <input type="file" id="intrinsicsFile" accept=".json" hidden>
+                        <div class="upload-content">
+                            <div class="upload-icon">📊</div>
+                            <p>Upload Camera Intrinsics</p>
+                            <span class="file-info">Required • .json format</span>
+                        </div>
+                    </div>
+                    <div class="upload-status" id="intrinsicsStatus"></div>
+                </div>
+            </div>
+
+            <!-- Process Button -->
+            <div class="process-section">
+                <button class="cyber-button process-btn" id="processBtn" disabled>
+                    <span class="btn-text">INITIATE PROCESSING</span>
+                    <span class="btn-glitch">INITIATE PROCESSING</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Pipeline Progress Section -->
+        <section class="progress-section" id="progressSection" style="display: none;">
+            <h2 class="section-title">
+                <i class="fas fa-cogs"></i> Pipeline Execution Matrix
+            </h2>
+            
+            <div class="pipeline-container">
+                <!-- Current Pipeline Display -->
+                <div class="current-pipeline">
+                    <div class="pipeline-header">
+                        <h3>Active Pipeline</h3>
+                        <div class="pipeline-selector">
+                            <div class="pipeline-option active" data-pipeline="target">
+                                <i class="fas fa-bullseye"></i>
+                                <span>Target</span>
+                            </div>
+                            <div class="pipeline-option" data-pipeline="query">
+                                <i class="fas fa-search"></i>
+                                <span>Query</span>
+                            </div>
+                            <div class="pipeline-option" data-pipeline="pose">
+                                <i class="fas fa-cube"></i>
+                                <span>Pose Overlay</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="current-step">
+                        <div class="step-indicator">
+                            <div class="step-number">1</div>
+                            <div class="step-info">
+                                <h4 id="currentStepTitle">Initializing...</h4>
+                                <p id="currentStepDescription">Preparing pipeline components</p>
+                            </div>
+                        </div>
+                        <div class="step-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="stepProgress"></div>
+                            </div>
+                            <span class="progress-text" id="progressText">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipeline Steps -->
+                <div class="pipeline-steps">
+                    <div class="step-card" data-step="1">
+                        <div class="step-header">
+                            <div class="step-icon">
+                                <i class="fas fa-upload"></i>
+                            </div>
+                            <h4>Data Preprocessing</h4>
+                            <div class="step-status pending">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="step-details">
+                            <p>Loading and validating input data</p>
+                            <div class="step-modules">
+                                <span class="module">File Validation</span>
+                                <span class="module">Data Parsing</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card" data-step="2">
+                        <div class="step-header">
+                            <div class="step-icon">
+                                <i class="fas fa-eye"></i>
+                            </div>
+                            <h4>CNOS Processing</h4>
+                            <div class="step-status pending">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="step-details">
+                            <p>Object detection and segmentation</p>
+                            <div class="step-modules">
+                                <span class="module">Object Detection</span>
+                                <span class="module">Mask Generation</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card" data-step="3">
+                        <div class="step-header">
+                            <div class="step-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                            <h4>DINOv2 Features</h4>
+                            <div class="step-status pending">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="step-details">
+                            <p>Visual feature extraction</p>
+                            <div class="step-modules">
+                                <span class="module">Feature Extraction</span>
+                                <span class="module">Descriptor Generation</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card" data-step="4">
+                        <div class="step-header">
+                            <div class="step-icon">
+                                <i class="fas fa-shapes"></i>
+                            </div>
+                            <h4>GeDi Processing</h4>
+                            <div class="step-status pending">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="step-details">
+                            <p>Geometric feature processing</p>
+                            <div class="step-modules">
+                                <span class="module">Geometric Analysis</span>
+                                <span class="module">3D Features</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card" data-step="5">
+                        <div class="step-header">
+                            <div class="step-icon">
+                                <i class="fas fa-crosshairs"></i>
+                            </div>
+                            <h4>Pose Estimation</h4>
+                            <div class="step-status pending">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="step-details">
+                            <p>6D pose calculation and refinement</p>
+                            <div class="step-modules">
+                                <span class="module">RANSAC</span>
+                                <span class="module">Pose Refinement</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Logs -->
+                <div class="logs-container">
+                    <h3>
+                        <i class="fas fa-terminal"></i> Real-time Logs
+                    </h3>
+                    <div class="logs-window" id="logsWindow">
+                        <div class="log-entry">
+                            <span class="timestamp">[00:00:00]</span>
+                            <span class="log-level info">INFO</span>
+                            <span class="log-message">Pipeline initialized. Waiting for data...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="results-section" id="resultsSection" style="display: none;">
+            <h2 class="section-title">
+                <i class="fas fa-trophy"></i> Processing Results
+            </h2>
+            
+            <div class="results-container">
+                <div class="results-summary">
+                    <div class="summary-card">
+                        <h3>Processing Summary</h3>
+                        <div class="summary-stats">
+                            <div class="stat">
+                                <span class="stat-value" id="processingTime">--</span>
+                                <span class="stat-label">Total Time</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="detectedObjects">--</span>
+                                <span class="stat-label">Objects Detected</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-value" id="confidenceScore">--</span>
+                                <span class="stat-label">Confidence</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-visualization">
+                    <h3>Pose Visualization</h3>
+                    <div class="visualization-container" id="visualizationContainer">
+                        <div class="placeholder-viz">
+                            <i class="fas fa-cube"></i>
+                            <p>3D Pose Visualization will appear here</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-downloads">
+                    <h3>Download Results</h3>
+                    <div class="download-options">
+                        <button class="download-btn" id="downloadPose">
+                            <i class="fas fa-download"></i>
+                            <span>Pose Estimation Data</span>
+                            <small>.json format</small>
+                        </button>
+                        <button class="download-btn" id="downloadVisualization">
+                            <i class="fas fa-download"></i>
+                            <span>3D Visualization</span>
+                            <small>.png format</small>
+                        </button>
+                        <button class="download-btn" id="downloadDescriptors">
+                            <i class="fas fa-download"></i>
+                            <span>Feature Descriptors</span>
+                            <small>.npy format</small>
+                        </button>
+                        <button class="download-btn primary" id="downloadAll">
+                            <i class="fas fa-download"></i>
+                            <span>Complete Results Package</span>
+                            <small>.zip archive</small>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="pipeline.js"></script>
+</body>
+</html>
