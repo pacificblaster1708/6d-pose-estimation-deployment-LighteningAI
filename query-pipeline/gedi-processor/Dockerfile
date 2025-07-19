@@ -52,7 +52,7 @@ RUN git clone https://github.com/erikwijmans/Pointnet2_PyTorch.git /app/pointnet
 WORKDIR /app/pointnet2/pointnet2_ops_lib
 RUN pip install .
 
-# Clone your modified GeDi repository
+# Clone your modified GeDi repository (FIXED)
 WORKDIR /app
 RUN git clone https://github.com/pacificblaster1708/GeDi-Modified-1.git /app/gedi-repo
 
@@ -66,13 +66,13 @@ RUN python download_data.py
 
 # Create directories and set ownership
 WORKDIR /app
-RUN mkdir -p /app/output/gedi_features /app/data /app/logs /app/performance && \
+RUN mkdir -p /app/output/gedi_features /app/data /app/logs /app/temp && \
     chown -R user:user /app
 
 COPY --chown=user . /app
 USER user
 
-# Set Python path to include GeDi and PointNet2 (fixed syntax)
+# Set Python path to include GeDi and PointNet2
 ENV PYTHONPATH="/app/gedi-repo:/app/pointnet2"
 
-CMD ["python", "gedi_processor_service.py"]
+CMD ["python", "target_gedi_service.py"]
