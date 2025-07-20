@@ -47,7 +47,7 @@ RUN pip install .
 
 # Clone GeDi repository
 WORKDIR /app
-RUN git clone https://github.com/Gorilla-Lab-SCUT/gorilla-3d.git /app/gedi-repo
+RUN https://github.com/pacificblaster1708/GeDi-Modified-1/tree/main
 
 # Create directories
 RUN mkdir -p /app/output/gedi_features /app/data /app/logs /app/temp && \
